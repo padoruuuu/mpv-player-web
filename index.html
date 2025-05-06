@@ -2,54 +2,76 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>WebTorrent HTML5 Player</title>
+  <title>WebTorrent + VLC.js Player</title>
   <style>
-    body { margin: 0; background: #000; color: #fff; display: flex; align-items: center; justify-content: center; height: 100vh; }
-    video { max-width: 90%; max-height: 90%; background: #000; }
-    #message { font-size: 1.2em; }
+    html, body { width:100%; height:100%; margin:0; background:#000; color:#fff; }
+    #player-container {
+      position:absolute; top:0; left:0; right:0; bottom:0;
+      display:flex; align-items:center; justify-content:center;
+    }
+    #player { width:80%; height:80%; background:#000; }
+    .message {
+      position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+      font:1.2em sans-serif; text-align:center; padding:1em; color:#f88;
+    }
   </style>
 </head>
 <body>
-  <div id="message">Loading player...</div>
-  <video id="video" controls autoplay style="display:none;"></video>
+  <div id="player-container">
+    <div id="player"></div>
+  </div>
+  <div id="message" class="message" style="display:none;"></div>
 
-  <script src="https://cdn.jsdelivr.net/npm/webtorrent@latest/webtorrent.min.js"></script>
+  <!-- Local copies in your GitHub repo root -->
+  <script src="webtorrent.min.js"></script>
+  <script src="vlc-player.js"></script>
   <script>
-    (function() {
-      const params = new URLSearchParams(window.location.search);
-      const magnet = params.get('magnet');
-      const message = document.getElementById('message');
-      const videoEl = document.getElementById('video');
+  (function(){
+    const msg = document.getElementById('message');
+    const params = new URLSearchParams(location.search);
+    const magnet = params.get('magnet');
+    if (!magnet) {
+      msg.textContent = 'No magnet link provided.';
+      msg.style.display = '';
+      return;
+    }
 
-      if (!magnet) {
-        message.textContent = 'No magnet link provided.';
+    msg.textContent = 'Connecting to peers…';
+    msg.style.display = '';
+
+    const client = new WebTorrent();
+    client.add(magnet, torrent => {
+      // pick first video-like file
+      const file = torrent.files.find(f =>
+        f.name.match(/\.(mp4|mkv|webm|avi|mov|ogg)$/i)
+      );
+      if (!file) {
+        msg.textContent = 'No compatible video file found in torrent.';
         return;
       }
 
-      message.textContent = 'Connecting to peers...';
+      // hide message, show video via VLC.js
+      msg.style.display = 'none';
+      const playerEl = document.getElementById('player');
+      const player = new VLCPlayer({ element: playerEl });
 
-      const client = new WebTorrent();
-      client.add(magnet, torrent => {
-        // find the first video file supported by HTML5
-        const file = torrent.files.find(file => file.name.match(/\.(mp4|webm|ogg)$/i));
-        if (!file) {
-          message.textContent = 'No playable video file (mp4/webm/ogg) found in torrent.';
+      file.getBlobURL((err, url) => {
+        if (err) {
+          console.error(err);
+          msg.textContent = 'Error creating video URL.';
+          msg.style.display = '';
           return;
         }
-        // render to video element
-        message.style.display = 'none';
-        videoEl.style.display = '';
-        file.renderTo(videoEl, {
-          autoplay: true,
-          controls: true
-        });
+        player.play(url);
       });
+    });
 
-      client.on('error', err => {
-        console.error(err);
-        message.textContent = 'Error loading torrent: ' + err.message;
-      });
-    })();
+    client.on('error', err => {
+      console.error(err);
+      msg.textContent = 'WebTorrent error: ' + err.message;
+      msg.style.display = '';
+    });
+  })();
   </script>
 </body>
 </html>
