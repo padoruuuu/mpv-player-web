@@ -2,40 +2,52 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>WebTorrent VLC.js Player</title>
+  <title>WebTorrent HTML5 Player</title>
   <style>
-    body { margin: 0; background: #000; color: #fff; font-family: sans-serif; }
-    #player-container { position: absolute; top:0; left:0; right:0; bottom:0; display:flex; align-items:center; justify-content:center; }
-    #player { width:80%; height:80%; background:#000; }
+    body { margin: 0; background: #000; color: #fff; display: flex; align-items: center; justify-content: center; height: 100vh; }
+    video { max-width: 90%; max-height: 90%; background: #000; }
+    #message { font-size: 1.2em; }
   </style>
 </head>
 <body>
-  <div id="player-container">
-    <div id="player"></div>
-  </div>
+  <div id="message">Loading player...</div>
+  <video id="video" controls autoplay style="display:none;"></video>
+
   <script src="https://cdn.jsdelivr.net/npm/webtorrent@latest/webtorrent.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/vlc-media-player@1.0.1/vlc-player.js"></script>
   <script>
-    (async function(){
+    (function() {
       const params = new URLSearchParams(window.location.search);
       const magnet = params.get('magnet');
-      if(!magnet){
-        document.body.innerHTML='<p>No magnet link provided.</p>';
+      const message = document.getElementById('message');
+      const videoEl = document.getElementById('video');
+
+      if (!magnet) {
+        message.textContent = 'No magnet link provided.';
         return;
       }
+
+      message.textContent = 'Connecting to peers...';
+
       const client = new WebTorrent();
-      client.add(magnet, async function(torrent){
-        const file = torrent.files.find(f => f.name.match(/\.(mp4|mkv|webm|avi)$/i));
-        if(!file){
-          alert('No compatible video file found in torrent.');
+      client.add(magnet, torrent => {
+        // find the first video file supported by HTML5
+        const file = torrent.files.find(file => file.name.match(/\.(mp4|webm|ogg)$/i));
+        if (!file) {
+          message.textContent = 'No playable video file (mp4/webm/ogg) found in torrent.';
           return;
         }
-        file.getBlobURL(function(err, url){
-          if(err){ console.error(err); return; }
-          const playerDiv = document.getElementById('player');
-          const player = new VLCPlayer({ element: playerDiv });
-          player.play(url);
+        // render to video element
+        message.style.display = 'none';
+        videoEl.style.display = '';
+        file.renderTo(videoEl, {
+          autoplay: true,
+          controls: true
         });
+      });
+
+      client.on('error', err => {
+        console.error(err);
+        message.textContent = 'Error loading torrent: ' + err.message;
       });
     })();
   </script>
