@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>WebTorrent VLC.js Player</title>
+  <style>
+    body { margin: 0; background: #000; color: #fff; font-family: sans-serif; }
+    #player-container { position: absolute; top:0; left:0; right:0; bottom:0; display:flex; align-items:center; justify-content:center; }
+    #player { width:80%; height:80%; background:#000; }
+  </style>
+</head>
+<body>
+  <div id="player-container">
+    <div id="player"></div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/webtorrent@latest/webtorrent.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vlc-media-player@1.0.1/vlc-player.js"></script>
+  <script>
+    (async function(){
+      const params = new URLSearchParams(window.location.search);
+      const magnet = params.get('magnet');
+      if(!magnet){
+        document.body.innerHTML='<p>No magnet link provided.</p>';
+        return;
+      }
+      const client = new WebTorrent();
+      client.add(magnet, async function(torrent){
+        const file = torrent.files.find(f => f.name.match(/\.(mp4|mkv|webm|avi)$/i));
+        if(!file){
+          alert('No compatible video file found in torrent.');
+          return;
+        }
+        file.getBlobURL(function(err, url){
+          if(err){ console.error(err); return; }
+          const playerDiv = document.getElementById('player');
+          const player = new VLCPlayer({ element: playerDiv });
+          player.play(url);
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
